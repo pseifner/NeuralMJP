@@ -1,0 +1,190 @@
+name: 100_length_ts
+num_runs: 1
+num_workers: 1
+world_size: 1
+distributed: false
+gpus: !!python/tuple [ "0" ]
+seed: 1
+
+model:
+  module: neuralmjp.models
+  name: VAEMJP
+  args:
+    descr: 
+
+    # pretraining
+    pretrain_period_steps: 2100 
+    pretrain_ts_length: 10
+    pretrain_annealing_steps: 8400 
+    pretrain_random_indices: True
+
+    # Optimization schedule
+    optimize_prior_separately: True
+
+    # MLP and optimization regularizations
+    layer_normalization: True     # layer normalization for all MLPs of model
+    dropout: 0.2                  # dropout for all MLPs of model
+
+    # data properties
+    data_dim: 5
+    max_obs_time: 1
+
+    # posterior process properties
+    n_states: 2
+    n_proc: 1
+
+    # prior process properties
+    n_prior_params: 4
+
+    mastereqencoder:
+      module: neuralmjp.models.blocks
+      name: MasterEq
+      args:
+        # options for solving Master Equation
+        irregularly_sampled_obs: False
+
+        # options for normalizing qs
+        q_cutoff: 0.000000001
+        norm_q_in_me: False
+
+        # MI regularization
+        use_mi_elbo: False
+
+        # Quadrature params
+        n_steps_quadrature: 200                     #
+
+        # Ode solver params for ME:
+        solver_method: dopri5
+        use_adjoint_method: False
+        use_symplectic_adjoint: False
+        rtol: 0.001     # 0.001
+        atol: 0.001
+        adjoint_rtol: 0.001
+        adjoint_atol: 0.001
+
+        # Sample posterior process
+        hard_samples: False
+
+        # Component params:
+        encoder:
+          module: neuralmjp.models.blocks
+          name: ODERNN
+          args:
+            # time and data representation
+            hidden_dim: 256
+
+            use_fourier_time_embedding: True
+            n_freqs: 10
+            n_comps: 20
+
+            # options for backward latent ode
+            init_solver_time: 0.1
+            activation_ode: Tanh
+            layers_ode: !!python/tuple [ 256, 256]          #
+            init_ode: None
+            use_steer: True                             # https://arxiv.org/abs/2006.10711
+            steer_eps: 0.000001
+
+            # ode solver params:
+            solver_method: rk4
+            use_adjoint_method: False
+
+            # options for learning initial distribution
+            activation_q0: ReLU
+            layers_mlp_q0: !!python/tuple [ 128, 128 ]
+            init_mlp_q0: "kai_normal"
+
+        latent_process:
+          module: neuralmjp.models.blocks
+          name: GenericMeanField
+          args:
+            rate_cutoff: 0.0000001        # cut off all rates by rate_cutoff before taking log (to avoid log(0))
+
+            # options for MLP of posterior rates
+            activation_mlp_rates: Tanh
+            layers_mlp_rates: !!python/tuple [ 256, 256, 128 ]
+            init_mlp_rates: None
+
+            # Generative Prior params
+            use_generative_prior_params: True
+            input_dim_prior_params_mlp: 64
+            layers_prior_params: !!python/tuple [64]
+            activation_prior_params: ReLU
+            init_prior_params: "kai_normal"
+
+    decoder:
+      module: neuralmjp.models.blocks
+      name: GaussianDecoder
+      args:
+        # options for reconstruction mlp
+        activation_mlp_decoder: ReLU
+        layers_mlp_decoder: !!python/tuple [128, 128]
+        init_mlp_decoder: None
+        one_hot_input: True
+
+        z_as_mean: False
+        diag_cov: True
+        fixed_diag_cov: None
+
+
+data_loader:
+  module: neuralmjp.data.dataloaders
+  name: FileDataLoader
+  args:
+    batch_size: 32
+    dataset: LotkaVolterraDataset
+    root_dir: data/brownian_dynamics/true_obs.npy 
+    train_fraction: 0.9
+    normalize_obs: False
+    normalize_times: True
+
+optimizer:
+  module: torch.optim
+  name: Adam
+  args:
+    lr: 0.0001
+    amsgrad: True
+  gradient_norm_clipping: 1
+
+trainer:
+  module: neuralmjp.trainer
+  name: LotkaVolterraTrainer
+  args:
+    bm_metric: Rec-Loss
+    save_after_epoch: 2
+    reconstruction_every: 100
+    num_samples: 10
+    lr_schedulers: !!python/tuple
+      - optimizer:
+          counter: 0
+          module: torch.optim.lr_scheduler
+          name: StepLR
+          args:
+            step_size: 100
+            gamma: 0.8
+    schedulers: !!python/tuple
+      - module: neuralmjp.utils.param_scheduler
+        name: ConstantScheduler
+        label: kl_scheduler
+        args:
+          beta: 1
+      - module: neuralmjp.utils.param_scheduler
+        name: ConstantScheduler
+        label: kl_q0_scheduler
+        args:
+          beta: 0
+      - module: neuralmjp.utils.param_scheduler
+        name: ConstantScheduler
+        label: temperature_scheduler
+        args:
+          beta: 1
+
+  epochs: 10000
+  save_dir: results/browniandynamics/
+  logging:
+    tensorboard_dir: results/browniandynamics/
+    logging_dir: results/browniandynamics/
+    formatters:
+      verbose: "%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s"
+      simple: "%(levelname)s %(asctime)s %(message)s"
+

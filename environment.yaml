@@ -1,0 +1,16 @@
+name: neuralmjp
+dependencies:
+- python=3.9
+- pip
+- pip:
+  - numpy
+  - scipy
+  - tensorboard
+  - matplotlib
+  - pyyaml
+  - typing
+  - abcplus
+  - click
+  - tqdm
+  - scikit-learn
+  - torchdiffeq
