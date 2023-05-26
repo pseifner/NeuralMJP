@@ -6,11 +6,11 @@ Code accompanying the paper *"Neural Markov Jump Processes"* published at ICML 2
 ### Quicklinks
 
 
-[NeuralMJP training loop]()
+[NeuralMJP training loop](https://github.com/pseifner/NeuralMJP/blob/1c34d0117b96a0dbcc78796290d46b721ffcb584/src/neuralmjp/models/models.py#L114)
 
-[Subblocks](), including a solver for the master equation and various prior / posterior processes
+[Subblocks](https://github.com/pseifner/NeuralMJP/blob/1c34d0117b96a0dbcc78796290d46b721ffcb584/src/neuralmjp/models/blocks.py), including a solver for the master equation and various prior / posterior processes
 
-Hyperparameters are specified in [configuration files]()
+Hyperparameters are specified in [configuration files](https://github.com/pseifner/NeuralMJP/tree/1c34d0117b96a0dbcc78796290d46b721ffcb584/configs/models)
 
 
 ### Setup
